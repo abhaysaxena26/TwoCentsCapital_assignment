@@ -39,7 +39,8 @@ export default function HomePage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Book */}
         <div className="lg:col-span-2 bg-[#131c27]/70 border border-[#1e2a36] backdrop-blur-md p-6 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-          <OrderBook bids={bidsWithTotals} asks={asksWithTotals} />
+          <OrderBook bids={bidsWithTotals as any} asks={asksWithTotals as any} />
+
           {/* <DepthChart bids={bidsWithTotals} asks={asksWithTotals} /> */}
         </div>
 

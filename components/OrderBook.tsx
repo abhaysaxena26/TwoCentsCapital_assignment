@@ -1,11 +1,22 @@
 "use client";
-import React, { useMemo, useState, Suspense } from "react";
-import { useOrderBook } from "../hooks/useOrderBook";
-// const LazyDepthChart = React.lazy(() => import("./DepthChart"));
 
-export default function OrderBook() {
+import React, { useMemo, useState, Suspense } from "react";
+
+interface Order {
+  price: number;
+  amount: number;
+  total?: number;
+}
+
+interface OrderBookProps {
+  bids: Order[];
+  asks: Order[];
+}
+
+export default function OrderBook({ bids = [], asks = [] }: OrderBookProps) {
   const [symbol, setSymbol] = useState("BTCUSDT");
-  const { bids = [], asks = [], trades = [], connected } = useOrderBook(symbol);
+  const [connected, setConnected] = useState(true); // fake connection state, since now data comes as props
+
 
   const sortedBids = useMemo(() => [...bids].sort((a, b) => b.price - a.price), [bids]);
   const sortedAsks = useMemo(() => [...asks].sort((a, b) => a.price - b.price), [asks]);

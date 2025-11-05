@@ -1,91 +1,83 @@
-import { useEffect, useState, useRef } from "react";
+"use client";
 
-export interface Order {
+import { useEffect, useRef, useState } from "react";
+
+interface Order {
   price: number;
   amount: number;
 }
 
-export interface Trade {
+interface Trade {
   price: number;
-  amount: number;
+  quantity: number;
   side: "buy" | "sell";
-  time: number;
 }
 
-export const useOrderBook = (symbol: string) => {
+export function useOrderBook(symbol: string) {
   const [bids, setBids] = useState<Order[]>([]);
   const [asks, setAsks] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [connected, setConnected] = useState(false);
 
-  const depthSocketRef = useRef<WebSocket | null>(null);
-  const tradeSocketRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    if (!symbol) return;
-
-    const depthSocket = new WebSocket(
+    const ws = new WebSocket(
       `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@depth20@100ms`
     );
-    const tradeSocket = new WebSocket(
-      `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@aggTrade`
-    );
+    wsRef.current = ws;
 
-    depthSocketRef.current = depthSocket;
-    tradeSocketRef.current = tradeSocket;
+    ws.onopen = () => setConnected(true);
 
-    depthSocket.onopen = () => setConnected(true);
-    tradeSocket.onopen = () => setConnected(true);
-
-    depthSocket.onclose = () => setConnected(false);
-    tradeSocket.onclose = () => setConnected(false);
-
-    depthSocket.onerror = () => setConnected(false);
-    tradeSocket.onerror = () => setConnected(false);
-
-    // Orderbook updates
-    depthSocket.onmessage = (event) => {
+    ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (Array.isArray(data.bids) && Array.isArray(data.asks)) {
-        setBids(
-          data.bids
-            .slice(0, 15)
-            .map(([p, q]: [string, string]) => ({
-              price: parseFloat(p),
-              amount: parseFloat(q),
-            }))
-            .filter((b: Order) => b.amount > 0)
-        );
 
-        setAsks(
-          data.asks
-            .slice(0, 15)
-            .map(([p, q]: [string, string]) => ({
-              price: parseFloat(p),
-              amount: parseFloat(q),
-            }))
-            .filter((a: Order) => a.amount > 0)
-        );
+      if (data.bids && data.asks) {
+        const newBids = data.bids.map((b: [string, string]) => ({
+          price: parseFloat(b[0]),
+          amount: parseFloat(b[1]),
+        }));
+        const newAsks = data.asks.map((a: [string, string]) => ({
+          price: parseFloat(a[0]),
+          amount: parseFloat(a[1]),
+        }));
+
+        setBids(newBids);
+        setAsks(newAsks);
       }
     };
 
-    // Trade updates
+    ws.onclose = () => setConnected(false);
+    ws.onerror = () => setConnected(false);
+
+    return () => {
+      ws.close();
+    };
+  }, [symbol]);
+
+  // Get trades (optional live trade stream)
+  useEffect(() => {
+    const tradeSocket = new WebSocket(
+      `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@trade`
+    );
+
     tradeSocket.onmessage = (event) => {
       const data = JSON.parse(event.data);
       const trade: Trade = {
         price: parseFloat(data.p),
-        amount: parseFloat(data.q),
+        quantity: parseFloat(data.q),
         side: data.m ? "sell" : "buy",
-        time: data.T,
       };
-      setTrades((prev) => [trade, ...(prev || [])].slice(0, 50));
+      setTrades((prev) => [trade, ...prev.slice(0, 50)]); // Keep latest 50
     };
 
+    tradeSocket.onclose = () => {};
+    tradeSocket.onerror = () => {};
+
     return () => {
-      depthSocket.close();
       tradeSocket.close();
     };
   }, [symbol]);
 
   return { bids, asks, trades, connected };
-};
+}
